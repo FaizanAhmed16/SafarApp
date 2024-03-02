@@ -34,7 +34,7 @@ const registerUser = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error("User data is not valid");
   }
-  res.json({ message: "Register the user" });
+  res.json({ message: "Register the user" }).json({accessToken});
 });
 
 //@desc Login user
@@ -57,7 +57,7 @@ const loginUser = asyncHandler(async (req, res) => {
           id: user.id,
         },
       },
-      process.env.ACCESS_TOKEN_SECERT,
+      process.env.ACCESS_TOKEN_SECRET,
       { expiresIn: "15m" }
     );
     res.status(200).json({ accessToken });
