@@ -15,6 +15,12 @@ const userSchema = mongoose.Schema(
       type: String,
       required: [true, "Please add the user password"],
     },
+    favoriteRoutes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "BusRoute",
+      },
+    ],
   },
   {
     timestamps: true,

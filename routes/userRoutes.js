@@ -6,7 +6,11 @@ const {
   loginUser,
 } = require("../controllers/userController");
 
-const { getRoutes } = require("../controllers/routeController");
+const {
+  getRoutes,
+  addFavoriteRoute,
+  getFavoriteRoutes,
+} = require("../controllers/routeController");
 
 const validateToken = require("../middleware/validateTokenHandler");
 
@@ -19,5 +23,9 @@ router.post("/login", loginUser);
 router.get("/current", validateToken, currentUser);
 
 router.get("/routes", getRoutes);
+
+router.post("/users/:userId/favorite-routes", addFavoriteRoute);
+
+router.get("/users/:userId/favorite-routes", getFavoriteRoutes);
 
 module.exports = router;
