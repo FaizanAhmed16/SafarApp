@@ -63,4 +63,30 @@ const getFavoriteRoutes = async (req, res) => {
   }
 };
 
-module.exports = { getRoutes, addFavoriteRoute, getFavoriteRoutes };
+const getStopDetails = async (req, res) => {
+  const { routeId, stopId } = req.params;
+
+  try {
+    const route = await BusRoute.findById(routeId);
+    if (!route) {
+      return res.status(404).json({ message: "Route not found" });
+    }
+
+    const stop = route.stops.find((stop) => stop.stopId.toString() === stopId);
+    if (!stop) {
+      return res.status(404).json({ message: "Stop not found" });
+    }
+
+    res.json(stop);
+  } catch (error) {
+    console.error("Error getting stop details:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+module.exports = {
+  getRoutes,
+  addFavoriteRoute,
+  getFavoriteRoutes,
+  getStopDetails,
+};
