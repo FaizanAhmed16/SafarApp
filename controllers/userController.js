@@ -2,6 +2,8 @@ const asyncHandler = require("express-async-handler");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
+const findNearest = require("../helpers/findNearest");
+const Stop = require("../models/busStopModel");
 
 //@desc Register a user
 //@route POST /api/users/register
@@ -34,7 +36,7 @@ const registerUser = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error("User data is not valid");
   }
-  res.json({ message: "Register the user" }).json({accessToken});
+  res.json({ message: "Register the user" }).json({ accessToken });
 });
 
 //@desc Login user
@@ -74,4 +76,22 @@ const currentUser = asyncHandler(async (req, res) => {
   res.json(req.user);
 });
 
-module.exports = { registerUser, loginUser, currentUser };
+const findNearestStop = asyncHandler(async (req, res) => {
+  try {
+    // Assuming userLocation is an object with latitude and longitude properties
+    const userLocation = req.body.userLocation;
+    const [userLng, userLat] = userLocation.coordinates;
+
+    // Find all stops and calculate distances
+    const stops = await Stop.find();
+    const nearestStop = findNearest(userLat, userLng, stops);
+
+    res.status(200).json(nearestStop);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error finding nearest stop", error: error.message });
+  }
+});
+
+module.exports = { registerUser, loginUser, currentUser, findNearestStop };

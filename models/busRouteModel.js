@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const autoIncrement = require("mongoose-auto-increment");
+const AutoIncrement = require("mongoose-sequence")(mongoose);
 
 const busRouteSchema = mongoose.Schema({
   busID: {
@@ -38,8 +38,7 @@ const busRouteSchema = mongoose.Schema({
   },
 });
 
-autoIncrement.initialize(mongoose.connection);
-busRouteSchema.plugin(autoIncrement.plugin, { model: "BusRoute", field: "busID" });
+busRouteSchema.plugin(AutoIncrement, { inc_field: "busID" });
 
 const BusRoute = mongoose.model("BusRoute", busRouteSchema);
 
