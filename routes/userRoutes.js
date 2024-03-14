@@ -10,6 +10,7 @@ const {
   getRoutes,
   addFavoriteRoute,
   getFavoriteRoutes,
+  getStopDetails,
 } = require("../controllers/routeController");
 
 const validateToken = require("../middleware/validateTokenHandler");
@@ -27,5 +28,7 @@ router.get("/routes", getRoutes);
 router.post("/users/:userId/favorite-routes", addFavoriteRoute);
 
 router.get("/users/:userId/favorite-routes", getFavoriteRoutes);
+
+router.get("/:routeId/stops/:stopId", getStopDetails);
 
 module.exports = router;
