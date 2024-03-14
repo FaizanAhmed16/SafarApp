@@ -17,9 +17,13 @@ const busRouteSchema = mongoose.Schema({
   },
   stops: [
     {
-      stop: {
+      stopId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Stop",
+        ref: "BusStop",
+        required: true,
+      },
+      stopName: {
+        type: String,
         required: true,
       },
       arrivalTime: {
