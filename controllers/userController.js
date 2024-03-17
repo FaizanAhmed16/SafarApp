@@ -94,4 +94,47 @@ const findNearestStop = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { registerUser, loginUser, currentUser, findNearestStop };
+const addFunds = async (req, res) => {
+  try {
+    const { userID, amount } = req.body;
+
+    const user = await User.findById(userID);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.walletBalance += amount;
+    await user.save();
+
+    res.status(200).json({ message: "Funds added successfully" });
+  } catch (error) {
+    console.error("Error adding funds:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+const getWalletBalance = async (req, res) => {
+  try {
+    const { userID } = req.params;
+
+    const user = await User.findById(userID);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const balance = user.walletBalance;
+    res.status(200).json({ balance });
+  } catch (error) {
+    console.error("Error retrieving wallet balance:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+module.exports = {
+  registerUser,
+  loginUser,
+  currentUser,
+  findNearestStop,
+  addFunds,
+  getWalletBalance,
+};
