@@ -1,5 +1,6 @@
 const BusRoute = require("../models/busRouteModel");
 const User = require("../models/userModel");
+const Journey = require("../models/journeyModel");
 
 const getRoutes = async (req, res) => {
   try {
@@ -84,9 +85,86 @@ const getStopDetails = async (req, res) => {
   }
 };
 
+const recordJourneyEvent = async (userId, stopId, event) => {
+  try {
+    const journey = new Journey({ userId, stopId, event });
+    await journey.save();
+    return true;
+  } catch (error) {
+    console.error("Error recording journey event:", error.message);
+    throw new Error("Failed to record journey event");
+  }
+};
+
+const calculateStopsTraveled = async (boardingStopId, gettingOffStopId) => {
+  try {
+    // Find the bus route for the stops
+    const busRoute = await BusRoute.findOne({
+      stops: { $elemMatch: { stopId: boardingStopId } },
+    });
+
+    // Get the indices of the boarding and getting off stops in the route
+    const boardingIndex = busRoute.stops.findIndex(
+      (stop) => stop.stopId.toString() === boardingStopId.toString()
+    );
+    const gettingOffIndex = busRoute.stops.findIndex(
+      (stop) => stop.stopId.toString() === gettingOffStopId.toString()
+    );
+
+    // Calculate the number of stops traveled
+    const stopsTraveled = Math.abs(gettingOffIndex - boardingIndex) + 1; // Add 1 to include both boarding and getting off stops
+    return stopsTraveled;
+  } catch (error) {
+    console.error("Error calculating stops traveled:", error.message);
+    throw new Error("Failed to calculate stops traveled");
+  }
+};
+
+const calculateFare = (stopsTraveled) => {
+  const baseFare = 15; // Base fare for the journey
+  const perStopFare = 5; // Fare per stop
+  const maxFare = 55; // Maximum fare cap
+
+  // Calculate the fare based on the number of stops traveled
+  let fare = baseFare + perStopFare * (stopsTraveled - 1); // Subtract 1 to exclude the boarding stop
+  fare = Math.min(fare, maxFare); // Apply maximum fare cap
+  return fare;
+};
+
+const deductFare = async (userId, fare) => {
+  try {
+    // Find the user by userId
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Check if the user has sufficient balance
+    if (user.walletBalance < fare) {
+      throw new Error("Insufficient balance");
+    }
+
+    // Deduct the fare from the user's wallet balance
+    user.walletBalance -= fare;
+
+    // Save the updated user object
+    await user.save();
+
+    // Return true to indicate successful deduction
+    return true;
+  } catch (error) {
+    console.error("Error deducting fare from wallet:", error.message);
+    throw new Error("Failed to deduct fare from wallet");
+  }
+};
+
 module.exports = {
   getRoutes,
   addFavoriteRoute,
   getFavoriteRoutes,
   getStopDetails,
+  recordJourneyEvent,
+  calculateFare,
+  deductFare,
+  calculateStopsTraveled,
 };
