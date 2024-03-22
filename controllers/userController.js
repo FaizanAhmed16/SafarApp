@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
 const findNearest = require("../helpers/findNearest");
 const Stop = require("../models/busStopModel");
+const Payment = require("../models/paymentModel");
 
 //@desc Register a user
 //@route POST /api/users/register
@@ -130,6 +131,80 @@ const getWalletBalance = async (req, res) => {
   }
 };
 
+// Creating a new payment
+const createPayment = async (req, res) => {
+  try {
+    const {
+      userID,
+      amount,
+      paymentMethod,
+      serviceDetails,
+      mobileAccountNumber,
+      cardDetails,
+    } = req.body;
+
+    // Create a new payment instance
+    const newPayment = new Payment({
+      userID,
+      amount,
+      paymentMethod,
+      serviceDetails,
+      mobileAccountNumber,
+      cardDetails, // Make sure to handle cardDetails securely
+    });
+
+    // Save the payment instance to the database
+    const savedPayment = await newPayment.save();
+
+    // Respond with the saved payment
+    res.status(201).json(savedPayment);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Updating payment status
+const updatePaymentStatus = async (req, res) => {
+  try {
+    const { paymentID, status } = req.body;
+
+    // Update the payment status
+    const updatedPayment = await Payment.findOneAndUpdate(
+      { paymentID },
+      { status },
+      { new: true } // Returns the updated document
+    );
+
+    if (!updatedPayment) {
+      return res.status(404).json({ message: "Payment not found" });
+    }
+
+    // Respond with the updated payment information
+    res.status(200).json(updatedPayment);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Retrieving a payment by ID
+const getPaymentById = async (req, res) => {
+  try {
+    const { paymentID } = req.params;
+
+    // Retrieve the Payment
+    const payment = await Payment.findOne({ paymentID });
+
+    if (!payment) {
+      return res.status(404).json({ message: "Payment not found" });
+    }
+
+    // Found Payment
+    res.status(200).json(payment);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -137,4 +212,7 @@ module.exports = {
   findNearestStop,
   addFunds,
   getWalletBalance,
+  createPayment,
+  updatePaymentStatus,
+  getPaymentById,
 };
