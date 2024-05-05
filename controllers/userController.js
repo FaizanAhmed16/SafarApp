@@ -3,7 +3,8 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
 const findNearest = require("../helpers/findNearest");
-const Stop = require("../models/busStopModel");
+const BusStop = require("../models/busStopModel");
+const BusRoute = require("../models/busRouteModel");
 const Payment = require("../models/paymentModel");
 
 //@desc Register a user
@@ -77,23 +78,104 @@ const currentUser = asyncHandler(async (req, res) => {
   res.json(req.user);
 });
 
-const findNearestStop = asyncHandler(async (req, res) => {
+const findNearestStops = async (req, res) => {
   try {
-    // Assuming userLocation is an object with latitude and longitude properties
-    const userLocation = req.body.userLocation;
-    const [userLng, userLat] = userLocation.coordinates;
+    const userLocations = req.body.userLocations;
+    const nearestStops = [];
 
-    // Find all stops and calculate distances
-    const stops = await Stop.find();
-    const nearestStop = findNearest(userLat, userLng, stops);
+    const stops = await BusStop.find();
 
-    res.status(200).json(nearestStop);
+    // Loop through each user location
+    for (const userLocation of userLocations) {
+      const userLat = userLocation.coordinates[1];
+      const userLng = userLocation.coordinates[0];
+
+      let minDistance = Infinity;
+      let nearestStop = null;
+
+      // Find the nearest stop using Haversine formula
+      for (const stop of stops) {
+        const stopLat = stop.location.coordinates[1];
+        const stopLng = stop.location.coordinates[0];
+
+        const R = 6371e3; // Earth radius in meters
+        const φ1 = (userLat * Math.PI) / 180; // Latitude of user in radians
+        const φ2 = (stopLat * Math.PI) / 180; // Latitude of stop in radians
+        const Δφ = ((stopLat - userLat) * Math.PI) / 180; // Difference in latitudes
+        const Δλ = ((stopLng - userLng) * Math.PI) / 180; // Difference in longitudes
+
+        const a =
+          Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+          Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        const distance = R * c; // Distance between user and stop in meters
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestStop = stop;
+        }
+      }
+
+      if (nearestStop) {
+        nearestStops.push(nearestStop);
+      }
+    }
+
+    res.status(200).json(nearestStops);
   } catch (error) {
     res
       .status(500)
-      .json({ message: "Error finding nearest stop", error: error.message });
+      .json({ message: "Error finding nearest stops", error: error.message });
   }
-});
+};
+
+const findRoutesContainingStops = async (req, res) => {
+  try {
+    const nearestStops = req.body.nearestStops;
+
+    // Check if nearestStops is empty before querying
+    if (nearestStops.length === 0) {
+      return res.status(404).json({ message: "No Routes Found" }); // Early return for empty nearestStops
+    }
+
+    const routes = await BusRoute.find({
+      $and: [
+        { "stops.stopName": nearestStops[0].name },
+        { "stops.stopName": nearestStops[1].name },
+      ],
+    });
+
+    if (routes.length > 0) {
+      res.status(200).json(routes.map((route) => route.routeName));
+    } else {
+      res.status(404).json({ message: "No Routes Found" });
+    }
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error finding routes", error: error.message });
+  }
+};
+
+// const findNearestStop = asyncHandler(async (req, res) => {
+//   try {
+//     // Assuming userLocation is an object with latitude and longitude properties
+//     const userLocation = req.body.userLocation;
+//     const [userLng, userLat] = userLocation.coordinates;
+
+//     // Find all stops and calculate distances
+//     const stops = await Stop.find();
+//     const nearestStop = findNearest(userLat, userLng, stops);
+
+//     res.status(200).json(nearestStop);
+//   } catch (error) {
+//     res
+//       .status(500)
+//       .json({ message: "Error finding nearest stop", error: error.message });
+//   }
+// });
 
 const addFunds = async (req, res) => {
   try {
@@ -209,7 +291,8 @@ module.exports = {
   registerUser,
   loginUser,
   currentUser,
-  findNearestStop,
+  findNearestStops,
+  findRoutesContainingStops,
   addFunds,
   getWalletBalance,
   createPayment,

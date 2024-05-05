@@ -4,7 +4,8 @@ const {
   registerUser,
   currentUser,
   loginUser,
-  findNearestStop,
+  findNearestStops,
+  findRoutesContainingStops,
   addFunds,
   getWalletBalance,
   createPayment,
@@ -41,7 +42,9 @@ router.get("/users/:userId/favorite-routes", getFavoriteRoutes);
 
 router.get("/:routeId/stops/:stopId", getStopDetails);
 
-router.post("/nearest-stop", findNearestStop);
+router.post("/find-nearest-stops", findNearestStops);
+
+router.post("/find-routes", findRoutesContainingStops);
 
 router.post("/record-journey-event", recordJourneyEvent);
 

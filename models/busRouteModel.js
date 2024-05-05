@@ -26,20 +26,20 @@ const busRouteSchema = mongoose.Schema({
         type: String,
         required: true,
       },
-      arrivalTime: {
-        type: String,
-        required: true,
-      },
+      // arrivalTime: {
+      //   type: String,
+      //   required: true,
+      // },
     },
   ],
   capacity: {
     type: Number,
     default: 0,
   },
-  estimatedTime: {
-    type: String,
-    required: true,
-  },
+  // estimatedTime: {
+  //   type: String,
+  //   required: true,
+  // },
 });
 
 busRouteSchema.plugin(AutoIncrement, { inc_field: "routeID" });

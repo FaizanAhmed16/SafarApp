@@ -15,12 +15,6 @@ const busStopSchema = mongoose.Schema({
       default: [0, 0],
     },
   },
-  facilities: {
-    type: [String],
-    default: [],
-  },
-  // Add any other information related to stops, if needed
-  // For example, address, bus services available, etc.
 });
 
 const BusStop = mongoose.model("BusStop", busStopSchema);

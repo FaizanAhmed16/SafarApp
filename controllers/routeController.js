@@ -2,21 +2,37 @@ const BusRoute = require("../models/busRouteModel");
 const User = require("../models/userModel");
 const Journey = require("../models/journeyModel");
 
+// const getRoutes = async (req, res) => {
+//   try {
+//     const routes = await BusRoute.find({}, "routeName stops")
+//       .populate("stops.stop", "name")
+//       .exec();
+
+//     const formattedRoutes = routes.map((route) => {
+//       const stops = route.stops.map((stop) => stop.stop.name);
+//       return `${route.routeName} --> ${stops[0]} - ${stops[stops.length - 1]}`;
+//     });
+
+//     res.json(formattedRoutes);
+//   } catch (error) {
+//     console.error("Error fetching routes:", error);
+//     res.status(500).json({ message: "Internal Server Error" });
+//   }
+// };
+
 const getRoutes = async (req, res) => {
   try {
-    const routes = await BusRoute.find({}, "routeName stops")
-      .populate("stops.stop", "name")
-      .exec();
-
-    const formattedRoutes = routes.map((route) => {
-      const stops = route.stops.map((stop) => stop.stop.name);
-      return `${route.routeName} --> ${stops[0]} - ${stops[stops.length - 1]}`;
-    });
-
-    res.json(formattedRoutes);
+    const routes = await BusRoute.find({}).select(
+      "routeName stops.stopName -_id"
+    );
+    const simplifiedRoutes = routes.map((route) => ({
+      routeName: route.routeName,
+      firstStop: route.stops[0].stopName,
+      lastStop: route.stops[route.stops.length - 1].stopName,
+    }));
+    res.json(simplifiedRoutes);
   } catch (error) {
-    console.error("Error fetching routes:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).send(error);
   }
 };
 
