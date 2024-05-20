@@ -4,7 +4,7 @@ const BusStop = require("../models/busStopModel"); // Assuming your model is in 
 require("dotenv").config();
 
 // Replace with your actual MongoDB connection string
-const mongoURI =
+const mongoURI = process.env.CONNECTINGSTRING
   "mongodb+srv://admin:admin@myclass.iyagwdi.mongodb.net/SafarDB?retryWrites=true&w=majority";
 
 mongoose

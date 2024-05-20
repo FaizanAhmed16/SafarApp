@@ -22,17 +22,27 @@ const Journey = require("../models/journeyModel");
 
 const getRoutes = async (req, res) => {
   try {
-    const routes = await BusRoute.find({}).select(
-      "routeName stops.stopName -_id"
-    );
-    const simplifiedRoutes = routes.map((route) => ({
-      routeName: route.routeName,
-      firstStop: route.stops[0].stopName,
-      lastStop: route.stops[route.stops.length - 1].stopName,
-    }));
-    res.json(simplifiedRoutes);
+    const routes = await BusRoute.find({});
+    res.send(routes);
   } catch (error) {
-    res.status(500).send(error);
+    res
+      .status(500)
+      .send({ message: "Failed to fetch routes", error: error.message });
+  }
+};
+
+const fetchRoutes = async (req, res) => {
+  try {
+    const routes = await BusRoute.find({}, "routeID routeName").populate(
+      "stops",
+      "stopId stopName"
+    );
+    res.json(routes);
+  } catch (error) {
+    console.error("Error fetching routes:", error); // Added logging
+    res
+      .status(500)
+      .send({ message: "Failed to fetch routes", error: error.message });
   }
 };
 
@@ -80,6 +90,72 @@ const getFavoriteRoutes = async (req, res) => {
   }
 };
 
+const getRouteDetailsByName = async (req, res) => {
+  const { routeName } = req.params;
+  try {
+    const route = await BusRoute.findOne({ routeName }).populate(
+      "stops.stopId"
+    );
+    if (!route) {
+      return res.status(404).json({ message: "Route not found" });
+    }
+    res.json(route);
+  } catch (error) {
+    console.error("Error getting route details by name:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getFirstAndLastStopCoordinates = async (req, res) => {
+  const { routeId } = req.params;
+
+  try {
+    const route = await BusRoute.findById(routeId)
+      .populate("stops.stopId") // Ensure that BusStop data is loaded
+      .exec();
+
+    if (!route) {
+      return res.status(404).json({ message: "Route not found" });
+    }
+
+    const stops = route.stops;
+    if (stops.length < 2) {
+      return res.status(400).json({
+        message:
+          "Insufficient stops on the route to determine first and last stop.",
+      });
+    }
+
+    // Extract the first and last stop
+    const firstStop = stops[0].stopId;
+    const lastStop = stops[stops.length - 1].stopId;
+
+    // If stopId populating fails, it could lead to undefined values here; handle gracefully
+    if (!firstStop || !lastStop) {
+      return res
+        .status(500)
+        .json({ message: "Failed to retrieve stops details." });
+    }
+
+    // Constructing response with coordinates
+    const coordinates = {
+      firstStop: {
+        name: firstStop.name,
+        coordinates: firstStop.location.coordinates,
+      },
+      lastStop: {
+        name: lastStop.name,
+        coordinates: lastStop.location.coordinates,
+      },
+    };
+
+    res.json(coordinates);
+  } catch (error) {
+    console.error("Error retrieving first and last stop coordinates:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 const getStopDetails = async (req, res) => {
   const { routeId, stopId } = req.params;
 
@@ -112,12 +188,14 @@ const recordJourneyEvent = async (userId, stopId, event) => {
   }
 };
 
-const calculateStopsTraveled = async (boardingStopId, gettingOffStopId) => {
+const calculateStopsTraveled = async (
+  routeId,
+  boardingStopId,
+  gettingOffStopId
+) => {
   try {
-    // Find the bus route for the stops
-    const busRoute = await BusRoute.findOne({
-      stops: { $elemMatch: { stopId: boardingStopId } },
-    });
+    // Find the bus route using routeId
+    const busRoute = await BusRoute.findOne({ routeID: routeId });
 
     // Get the indices of the boarding and getting off stops in the route
     const boardingIndex = busRoute.stops.findIndex(
@@ -136,15 +214,22 @@ const calculateStopsTraveled = async (boardingStopId, gettingOffStopId) => {
   }
 };
 
-const calculateFare = (stopsTraveled) => {
+const calculateFare = (stopsTraveled, numberOfTickets) => {
   const baseFare = 15; // Base fare for the journey
   const perStopFare = 5; // Fare per stop
   const maxFare = 55; // Maximum fare cap
 
-  // Calculate the fare based on the number of stops traveled
-  let fare = baseFare + perStopFare * (stopsTraveled - 1); // Subtract 1 to exclude the boarding stop
-  fare = Math.min(fare, maxFare); // Apply maximum fare cap
-  return fare;
+  // Calculate the fare based only on the number of stops minus one to exclude the boarding stop
+  let fare = perStopFare * (stopsTraveled - 1);
+
+  // Apply constraints based on baseFare and maxFare
+  if (fare > maxFare) {
+    fare = maxFare;
+  } else if (fare < baseFare) {
+    fare = baseFare;
+  }
+
+  return fare * numberOfTickets;
 };
 
 const deductFare = async (userId, fare) => {
@@ -176,6 +261,7 @@ const deductFare = async (userId, fare) => {
 
 module.exports = {
   getRoutes,
+  fetchRoutes,
   addFavoriteRoute,
   getFavoriteRoutes,
   getStopDetails,
@@ -183,4 +269,6 @@ module.exports = {
   calculateFare,
   deductFare,
   calculateStopsTraveled,
+  getFirstAndLastStopCoordinates,
+  getRouteDetailsByName,
 };

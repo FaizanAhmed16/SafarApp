@@ -3,8 +3,8 @@ const connectDb = require("./config/dbConnection");
 const errorHandler = require("./middleware/errorHandler");
 const dotenv = require("dotenv").config();
 const userRoutes = require("./routes/userRoutes");
-const userController = require("./controllers/userController");
 const cors = require("cors");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 connectDb();
 
@@ -18,7 +18,6 @@ app.use(cors());
 
 app.use("/users", userRoutes);
 
-// app.use("/api/users", require("./routes/userRoutes"));
 app.use(errorHandler);
 
 app.listen(port, () => {

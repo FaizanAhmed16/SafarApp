@@ -1,45 +1,96 @@
 const asyncHandler = require("express-async-handler");
+const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
+const verifyGoogleToken = require("../helpers/verifyGoogleToken");
 const findNearest = require("../helpers/findNearest");
 const BusStop = require("../models/busStopModel");
 const BusRoute = require("../models/busRouteModel");
 const Payment = require("../models/paymentModel");
+const dotenv = require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
-//@desc Register a user
-//@route POST /api/users/register
-//@access public
-const registerUser = asyncHandler(async (req, res) => {
+const registerUser = async (req, res) => {
   const { username, email, password } = req.body;
+
+  // Check if all fields are provided
   if (!username || !email || !password) {
-    res.status(400);
-    throw new Error("All fields are mandatory!");
-  }
-  const userAvailable = await User.findOne({ email });
-  if (userAvailable) {
-    res.status(400);
-    throw new Error("User already registered!");
+    return res.status(400).json({ message: "Please enter all fields" });
   }
 
-  //Hash password
-  const hashedPassword = await bcrypt.hash(password, 10);
-  console.log("Hashed Password: ", hashedPassword);
-  const user = await User.create({
-    username,
-    email,
-    password: hashedPassword,
-  });
+  try {
+    // Check if the user already exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: "Email address already taken" });
+    }
 
-  console.log(`User created ${user}`);
-  if (user) {
-    res.status(201).json({ _id: user.id, email: user.email });
-  } else {
-    res.status(400);
-    throw new Error("User data is not valid");
+    // Hash the password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create a new user
+    const user = await User.create({
+      userID: new mongoose.Types.ObjectId(),
+      username,
+      email,
+      password: hashedPassword,
+    });
+
+    // Generate a token
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
+
+    // Send response
+    res.status(201).json({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      token,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
-  res.json({ message: "Register the user" }).json({ accessToken });
-});
+};
+
+const registerUserWithGoogle = async (req, res) => {
+  const { token } = req.body; // ID token from Google
+
+  try {
+    const googleUser = await verifyGoogleToken(token);
+    if (!googleUser) {
+      return res.status(403).json({ message: "Invalid Google token" });
+    }
+
+    // Check if the user already exists
+    let user = await User.findOne({ email: googleUser.email });
+    if (!user) {
+      // Create a new user if doesn't exist
+      user = await User.create({
+        username: googleUser.name,
+        email: googleUser.email,
+        googleId: googleUser.sub, // Google's user ID
+      });
+    }
+
+    // Generate a token for our app
+    const appToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
+
+    // Send response
+    res.status(201).json({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      token: appToken,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 //@desc Login user
 //@route POST /api/users/login
@@ -77,6 +128,21 @@ const loginUser = asyncHandler(async (req, res) => {
 const currentUser = asyncHandler(async (req, res) => {
   res.json(req.user);
 });
+
+const getUserDetails = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const { username, walletBalance } = user;
+    res.json({ username, walletBalance });
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 const findNearestStops = async (req, res) => {
   try {
@@ -159,24 +225,6 @@ const findRoutesContainingStops = async (req, res) => {
   }
 };
 
-// const findNearestStop = asyncHandler(async (req, res) => {
-//   try {
-//     // Assuming userLocation is an object with latitude and longitude properties
-//     const userLocation = req.body.userLocation;
-//     const [userLng, userLat] = userLocation.coordinates;
-
-//     // Find all stops and calculate distances
-//     const stops = await Stop.find();
-//     const nearestStop = findNearest(userLat, userLng, stops);
-
-//     res.status(200).json(nearestStop);
-//   } catch (error) {
-//     res
-//       .status(500)
-//       .json({ message: "Error finding nearest stop", error: error.message });
-//   }
-// });
-
 const addFunds = async (req, res) => {
   try {
     const { userID, amount } = req.body;
@@ -210,6 +258,22 @@ const getWalletBalance = async (req, res) => {
   } catch (error) {
     console.error("Error retrieving wallet balance:", error.message);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+const createPaymentIntent = async (req, res) => {
+  const { amount } = req.body;
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency: "usd",
+    });
+
+    res.json({ clientSecret: paymentIntent.client_secret });
+  } catch (err) {
+    console.error("Error creating payment intent:", err);
+    res.status(500).json({ error: "Failed to create payment intent" });
   }
 };
 
@@ -289,8 +353,10 @@ const getPaymentById = async (req, res) => {
 
 module.exports = {
   registerUser,
+  registerUserWithGoogle,
   loginUser,
   currentUser,
+  getUserDetails,
   findNearestStops,
   findRoutesContainingStops,
   addFunds,
@@ -298,4 +364,5 @@ module.exports = {
   createPayment,
   updatePaymentStatus,
   getPaymentById,
+  createPaymentIntent,
 };
